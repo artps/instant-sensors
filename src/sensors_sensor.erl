@@ -6,10 +6,10 @@
 -export([stop/1]).
 
 -export([init/1,
-		 state_idle/2, state_idle/3,
-		 state_working/2, state_working/3,
-		 handle_event/3, handle_sync_event/4, handle_info/3,
-         terminate/3, code_change/4]).
+        state_idle/2, state_idle/3,
+        state_working/2, state_working/3,
+        handle_event/3, handle_sync_event/4, handle_info/3,
+        terminate/3, code_change/4]).
 
 -define(SERVER, ?MODULE).
 -define(IDLE_TIMEOUT, 15000).
@@ -18,7 +18,7 @@
 
 
 start_link(SensorId) ->
-	gen_fsm:start_link(?MODULE, [SensorId], []).
+    gen_fsm:start_link(?MODULE, [SensorId], []).
 
 
 init([SensorId]) ->
@@ -35,7 +35,7 @@ state_idle(timeout, State) ->
     {next_state, state_working, State};
 
 state_idle(Msg, State) ->
-	{next_state, state_idle, ?IDLE_TIMEOUT}.
+    {next_state, state_idle, ?IDLE_TIMEOUT}.
 
 
 state_working(send_data, State) ->
@@ -51,38 +51,37 @@ state_working(send_data, State) ->
         State#state.sensor_id, Status
     ]),
 
-	{next_state, state_idle, NewState, ?IDLE_TIMEOUT div 2}.
+    {next_state, state_idle, NewState, ?IDLE_TIMEOUT div 2}.
 
 state_idle(_Event, _From, State) ->
-	{reply, ok, state_idle, State, ?IDLE_TIMEOUT}.
+    {reply, ok, state_idle, State, ?IDLE_TIMEOUT}.
 
 
 state_working(_Event, _From, State) ->
-	{reply, ok, state_idle, State, ?IDLE_TIMEOUT}.
+    {reply, ok, state_idle, State, ?IDLE_TIMEOUT}.
 
 
 handle_event(stop, _StateName, StateData) ->
     {stop, normal, StateData};
 
 handle_event(_Event, StateName, State) ->
-	{next_state, StateName, State}.
+    {next_state, StateName, State}.
 
 stop(Pid) ->
     gen_fsm:send_all_state_event(Pid, stop).
 
 
 handle_sync_event(_Event, _From, StateName, State) ->
-	Reply = ok,
-	{reply, Reply, StateName, State}.
+    {reply, ok, StateName, State}.
 
 handle_info(_Info, StateName, State) ->
-	{next_state, StateName, State}.
+    {next_state, StateName, State}.
 
 terminate(_Reason, _StateName, _State) ->
-	ok.
+    ok.
 
 code_change(_OldVsn, StateName, State, _Extra) ->
-	{ok, StateName, State}.
+    {ok, StateName, State}.
 
 
 get_timestamp() ->
