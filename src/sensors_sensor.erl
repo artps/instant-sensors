@@ -2,7 +2,7 @@
 
 -behaviour(gen_fsm).
 
--export([start_link/1]).
+-export([start_link/2]).
 -export([stop/1]).
 
 -export([init/1,
@@ -14,19 +14,20 @@
 -define(SERVER, ?MODULE).
 -define(IDLE_TIMEOUT, 15000).
 
--record(state, { sensor_id, lat, long, timestamp }).
+-record(state, { sensor_id, timestamp, station, stations }).
 
 
-start_link(SensorId) ->
-    gen_fsm:start_link(?MODULE, [SensorId], []).
+start_link(SensorId, Stations) ->
+    gen_fsm:start_link(?MODULE, [SensorId, Stations], []).
 
 
-init([SensorId]) ->
+init([SensorId, Stations]) ->
+    true = gproc:add_local_name(SensorId),
     {ok, state_idle, #state{
         sensor_id = SensorId,
         timestamp = get_timestamp(),
-        lat = get_lat(),
-        long = get_long()
+        station = 0,
+        stations = Stations
     }, ?IDLE_TIMEOUT}.
 
 
@@ -41,8 +42,7 @@ state_idle(Msg, State) ->
 state_working(send_data, State) ->
     NewState = State#state{
         timestamp = get_timestamp(),
-        lat = get_lat(State),
-        long = get_long(State)
+        station = State#state.station + 1
     },
 
     {Status, Headers, Body} = send_data(NewState),
@@ -87,33 +87,26 @@ code_change(_OldVsn, StateName, State, _Extra) ->
 get_timestamp() ->
     timer:now_diff(now(), {0,0,0}) div 1000000.
 
-get_lat() ->
-    55.794262.
-get_lat(State) ->
-    State#state.lat + random:uniform().
-
-get_long() ->
-    49.114468.
-get_long(State) ->
-    State#state.long + random:uniform().
-
 
 make_sensor_url(Collector, SensorId) when is_integer(SensorId) ->
     make_sensor_url(Collector, integer_to_list(SensorId));
 make_sensor_url(Collector, SensorId) ->
-
     Host = proplists:get_value(host, Collector),
-    Port = proplists:get_value(port, Collector),
+    Port = integer_to_list(proplists:get_value(port, Collector)),
     Protocol = proplists:get_value(protocol, Collector),
 
-    Protocol ++ "://" ++ filename:join([Host ++ ":" ++ Port, "sensors", SensorId]).
+    lists:flatten([Protocol, "://", Host, ":", Port, "/sensors/", SensorId]).
+
+get_coordinates(State) ->
+    lists:nth(State#state.station, State#state.stations).
 
 send_data(State) ->
     {ok, Collector} = application:get_env(sensors, collector),
+    Coordinates = get_coordinates(State),
     Body = jiffy:encode({[
         {timestamp, State#state.timestamp},
-        {lat, State#state.lat},
-        {long, State#state.long}
+        {lat, proplists:get_value(lat, Coordinates)},
+        {long, proplists:get_value(long, Coordinates)}
     ]}),
     Url = make_sensor_url(Collector, State#state.sensor_id),
     case httpc:request(put, {Url, [], "application/json", Body}, [], []) of
