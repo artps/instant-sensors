@@ -19,8 +19,6 @@ init([]) ->
 
     run_sensors(SensorsDataFiles),
 
-    error_logger:info_msg("~p~n", [SensorsDataFiles]),
-
     {ok, #state{}}.
 
 handle_call(_Request, _From, State) ->
@@ -40,12 +38,10 @@ code_change(_OldVsn, State, _Extra) ->
 
 
 run_sensors([Sensor|Sensors]) ->
-    SensorId = proplists:get_value(name, Sensor),
-    Stations = proplists:get_value(data, Sensor),
+    SensorId = proplists:get_value(<<"name">>, Sensor),
+    Stations = proplists:get_value(<<"data">>, Sensor),
 
-    error_logger:info_msg("Running~p~n", [SensorId]),
-
-    sensors_sensor_sup:start_child(SensorId, Stations),
+    sensors_sensor_sup:start_child(SensorId, lists:map(fun json_to_term/1, Stations)),
 
     run_sensors(Sensors);
 run_sensors([]) ->
@@ -66,22 +62,20 @@ read_sensors_data(Files, Max) when is_integer(Max) ->
 read_sensors_data(_, Result, 0) ->
     Result;
 read_sensors_data([File|Files], Result, Max) ->
-    read_sensors_data(Files, Result ++ [[
-        {name, Max},
-        {data, read_sensor_data(File)}
-    ]], Max - 1).
+    read_sensors_data(Files, Result ++ [read_sensor_data(File)], Max - 1).
 
 
 json_to_term({Data}) ->
     [
-        {lat, binary_to_float(proplists:get_value(<<"lat">>, Data))},
-        {long, binary_to_float(proplists:get_value(<<"long">>, Data))}
+        {lat, proplists:get_value(<<"lat">>, Data)},
+        {long, proplists:get_value(<<"long">>, Data)}
     ].
 
 read_sensor_data(Filename) ->
     {ok, Binary} = file:read_file(filename:join(["priv/data", Filename])),
 
-    lists:map(fun json_to_term/1, jiffy:decode(Binary)).
+    {Data} = jiffy:decode(Binary),
+    Data.
 
 
 binary_to_float(Binary) ->

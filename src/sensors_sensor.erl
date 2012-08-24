@@ -12,9 +12,9 @@
         terminate/3, code_change/4]).
 
 -define(SERVER, ?MODULE).
--define(IDLE_TIMEOUT, 15000).
+-define(IDLE_TIMEOUT, 1000).
 
--record(state, { sensor_id, timestamp, station, stations }).
+-record(state, { sensor_id, timestamp, station, stations, stations_count }).
 
 
 start_link(SensorId, Stations) ->
@@ -26,8 +26,9 @@ init([SensorId, Stations]) ->
     {ok, state_idle, #state{
         sensor_id = SensorId,
         timestamp = get_timestamp(),
-        station = 0,
-        stations = Stations
+        station = 1,
+        stations = Stations,
+        stations_count = length(Stations)
     }, ?IDLE_TIMEOUT}.
 
 
@@ -40,16 +41,16 @@ state_idle(Msg, State) ->
 
 
 state_working(send_data, State) ->
+    Station = State#state.station + 1,
     NewState = State#state{
         timestamp = get_timestamp(),
-        station = State#state.station + 1
+        station = case Station < State#state.stations_count of
+            true -> Station;
+            _ -> 1
+        end
     },
 
     {Status, Headers, Body} = send_data(NewState),
-
-    error_logger:info_msg("ID: ~p, Response: ~p~n", [
-        State#state.sensor_id, Status
-    ]),
 
     {next_state, state_idle, NewState, ?IDLE_TIMEOUT div 2}.
 
@@ -104,9 +105,11 @@ send_data(State) ->
     {ok, Collector} = application:get_env(sensors, collector),
     Coordinates = get_coordinates(State),
     Body = jiffy:encode({[
-        {timestamp, State#state.timestamp},
-        {lat, proplists:get_value(lat, Coordinates)},
-        {long, proplists:get_value(long, Coordinates)}
+        {name, State#state.sensor_id}, {data, {[
+            {timestamp, State#state.timestamp},
+            {lat, proplists:get_value(lat, Coordinates)},
+            {long, proplists:get_value(long, Coordinates)}
+        ]}}
     ]}),
     Url = make_sensor_url(Collector, State#state.sensor_id),
     case httpc:request(put, {Url, [], "application/json", Body}, [], []) of
