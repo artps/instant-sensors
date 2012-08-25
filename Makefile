@@ -26,7 +26,7 @@ clean-docs:
 	rm -f doc/edoc-info
 
 run:
-	erl +P 65535 -sname sensors -pa ebin -pa deps/*/ebin -boot start_sasl -s sensors -config priv/sensors.config
+	erl -K true -A 64 -W w +P 65535 -sname sensors -pa ebin -pa deps/*/ebin -boot start_sasl -s sensors -config priv/sensors.config
 
 build-plt:
 	@$(DIALYZER) --build_plt --output_plt .$(PROJECT).plt \

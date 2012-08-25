@@ -12,7 +12,7 @@
         terminate/3, code_change/4]).
 
 -define(SERVER, ?MODULE).
--define(IDLE_TIMEOUT, 1000).
+-define(IDLE_TIMEOUT, 5000).
 
 -record(state, { sensor_id, timestamp, station, stations, stations_count }).
 
